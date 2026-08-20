@@ -1,14 +1,15 @@
 /**
  * Turn-scoped image-accumulator Definition: collects attachment refs from
- * tool/result events whose presentationMeta carries images flagged `final`,
- * so a turn-tail entry can render the turn's deliverables as one gallery in
- * the closing output (not only inside individual tool-call cards).
+ * tool/result events, so a turn-tail entry can render the turn's image
+ * deliverables as one gallery in the closing output (not only inside
+ * individual tool-call cards).
  *
- * `final` is the tool's own declaration that its images are turn deliverables
- * (generate_image sets it true). Non-final producers — show_image displaying
- * intermediate work, or tools whose output merely embeds existing attachments
- * — stay out of the gallery: their images remain visible in their own
- * tool-call cards.
+ * Finality: a tool declares its result images as deliverables through the
+ * event-level presentationMeta (`data.meta.final === true`, set by
+ * generate_image; show_image sets false). Images from explicitly non-final
+ * results stay out of the gallery but remain visible in their own tool-call
+ * cards. Sessions produced before the final flag degrade gracefully: images
+ * with no meta at all still enter the gallery (pre-flag behavior).
  */
 import type {
   ConversationNodeDefinition,
@@ -28,27 +29,37 @@ export interface TurnImagesTurnData {
 
 declare module '@deepseek-ai/dsh-client-runtime/client' {
   interface ConversationTurnDataMap {
-    /** Final (deliverable) attachment refs produced by tools in this Turn. */
+    /** Attachment refs produced by tools in this Turn (generate_image, show_image, etc.). */
     turnImages: TurnImagesTurnData
   }
 }
 
-/** Read one presentationMeta-shaped object's declared images and final flag. */
-function readMeta(meta: unknown): { images: ImageAttachmentRef[]; final: boolean } {
-  if (meta === null || typeof meta !== 'object') return { images: [], final: false }
-  const m = meta as { images?: unknown; final?: unknown }
-  const images: ImageAttachmentRef[] = []
-  if (Array.isArray(m.images)) {
-    for (const image of m.images) {
-      if (image && typeof image === 'object' && typeof (image as { attachmentId?: unknown }).attachmentId === 'string') {
-        images.push(image as ImageAttachmentRef)
-      }
+/** Recursively collect image attachment refs from content blocks. */
+function collectImageRefs(content: readonly unknown[]): ImageAttachmentRef[] {
+  const refs: ImageAttachmentRef[] = []
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const b = block as { type?: string; attachment?: unknown; content?: unknown[] }
+    if (b.type === 'image' && b.attachment !== undefined && typeof b.attachment === 'object') {
+      refs.push(b.attachment as ImageAttachmentRef)
+    } else if (b.type === 'tool-result' && Array.isArray(b.content)) {
+      refs.push(...collectImageRefs(b.content))
     }
   }
-  return { images, final: m.final === true }
+  return refs
 }
 
-/** Turn-local final-image accumulator; publishes no view Node. */
+/**
+ * Read the event-level presentationMeta's final flag. `undefined` means the
+ * producer set no meta (pre-flag sessions); `false` is an explicit opt-out.
+ */
+function readMetaFinal(meta: unknown): boolean | undefined {
+  if (meta === null || typeof meta !== 'object') return undefined
+  const final = (meta as { final?: unknown }).final
+  return typeof final === 'boolean' ? final : undefined
+}
+
+/** Turn-local image accumulator; publishes no view Node. */
 export const turnImagesDefinition: ConversationNodeDefinition<{ turn: number; images: TurnImageRef[] }> = {
   kind: 'turnImages',
   match: (event) => {
@@ -62,17 +73,22 @@ export const turnImagesDefinition: ConversationNodeDefinition<{ turn: number; im
   },
   update: (context, match) => {
     if (match.event.type !== 'tool/result') return context.state
-    const message = match.event.data.message
+    const data = match.event.data as { message?: unknown; meta?: unknown }
+    const message = data.message as { content?: unknown[] } | undefined
     if (message === undefined) return context.state
-    // Only presentationMeta declares finality; the render content's image
-    // blocks are the same refs the tool already declared there.
-    const meta = (message as { meta?: unknown }).meta
-    const { images, final } = readMeta(meta)
-    if (!final || images.length === 0) return context.state
+    // Finality comes from the event-level meta (data.meta), the durable home
+    // of presentationMeta; "no meta" degrades to final (pre-flag sessions
+    // always showed their images), an explicit false opts out.
+    const final = readMetaFinal(data.meta)
+    if (final === false) return context.state
+    // Images come from the render content (image blocks, nested included) —
+    // the content path is what the durable log actually carries.
+    const refs = collectImageRefs(message.content ?? [])
+    if (refs.length === 0) return context.state
     // Dedup by attachmentId.
     const seen = new Set<string>(context.state.images.map(r => String(r.attachment.attachmentId)))
     const additions: TurnImageRef[] = []
-    for (const ref of images) {
+    for (const ref of refs) {
       const id = String(ref.attachmentId)
       if (seen.has(id)) continue
       seen.add(id)
@@ -92,9 +108,9 @@ export const turnImagesDefinition: ConversationNodeDefinition<{ turn: number; im
 }
 
 /**
- * Claim the turn-tail chain only when the turn produced final images.
+ * Claim the turn-tail chain only when the turn produced images.
  * @param owner - Turn-tail owner currency for the closing assistant.
- * @returns Final image refs as the component's match, or null to decline.
+ * @returns Image refs as the component's match, or null to decline.
  */
 export function selectTurnImages(owner: TurnTailOwnerProps): readonly TurnImageRef[] | null {
   const data = owner.turn.data.get('turnImages')
