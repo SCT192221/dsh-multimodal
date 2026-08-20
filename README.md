@@ -56,16 +56,12 @@ corepack pnpm dsh plugin --profile web add github:SCT192221/dsh-multimodal#path:
 
 ## 配置凭据
 
-火山方舟 API Key 分两个，写在 `~/.dsh/.credentials.yaml`：
+视觉与生图两个通道各配一个 API Key，写在 `~/.dsh/.credentials.yaml`：
 
 - `DSH_VISION_API_KEY` — 视觉模型
 - `DSH_GENERATION_API_KEY` — 生图模型
 
-装了 client 插件后在 web UI「设置 → 多模态」里填即可；没装 client 手编 `~/.dsh/.credentials.yaml`。本开源包不含凭据与运行时配置（`global-multimodal-config.json`），首次运行用默认配置；需要换模型/端点时在设置页改，或直接编辑插件目录下自动生成的 `global-multimodal-config.json`。
-
-## 与其他多模态 skill 冲突？
-
-本插件不干预任何已有 skill。如果你的环境里另有同用途的多模态 skill（例如经 cc-switch 共享 skill 目录挂进来的 `doubao-multimodal`），模型会同时看到两套入口。DSH 没有配置级的 per-skill 禁用开关；如需只在 DSH harness 内禁用某个 skill，可写一个 host 插件用 `ctx.skills.register` 注册同名 runtime skill 并设 `invocation: { modelInvocable: false, userInvocable: false }`——同 layer 内 runtime（rank 250）先于 custom（rank 300）被收集，同名 custom skill 会被忽略，其他 agent（claude/codex 等）不受影响。
+两个通道的模型 ID 与 Base URL 均可配置，支持任何 OpenAI 兼容端点（Gemini、GPT、豆包等），默认为火山方舟豆包。装了 client 插件后在 web UI「设置 → 多模态」里填即可；没装 client 手编 `~/.dsh/.credentials.yaml`。本开源包不含凭据与运行时配置（`global-multimodal-config.json`），首次运行用默认配置；需要换模型/端点时在设置页改，或直接编辑插件目录下自动生成的 `global-multimodal-config.json`。
 
 ## License
 
