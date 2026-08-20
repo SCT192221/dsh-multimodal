@@ -299,7 +299,7 @@ function channelInfo(channel) {
   throw new Error('未知的多模态通道')
 }
 
-export const name = 'global-multimodal'
+export const name = 'multimodal'
 export const inject = [
   'tools',
   'subprocess',

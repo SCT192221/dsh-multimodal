@@ -1,5 +1,5 @@
 {
-  "name": "dsh-global-multimodal",
+  "name": "dsh-multimodal",
   "version": "0.1.0",
   "description": "DeepSeek Harness host plugin: vision (image recognition/OCR/QA) + generate_image (text-to-image and reference-image editing with aspect-ratio matching) + show_image (inline local image display), plus text-only-model image-strip adaptation at the llm/stream boundary.",
   "type": "module",

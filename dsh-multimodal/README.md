@@ -1,4 +1,4 @@
-# dsh-global-multimodal
+# dsh-multimodal
 
 DeepSeek Harness 的多模态 host 插件：给文本模型补全视觉与生图能力，不改动 harness 源码。
 
@@ -28,11 +28,11 @@ corepack pnpm dsh plugin --profile web add <github-url-of-this-repo>
 
 ### 方式 B：file:// 挂载（当前可用）
 
-把 `index.mjs` + `multimodal-helper.cjs` 放到 `~/.dsh/plugins/dsh-global-multimodal/`，在 web profile 的 `~/.dsh/profiles/web/cordis.patch.yml` 的 `- insert:` 数组加：
+把 `index.mjs` + `multimodal-helper.cjs` 放到 `~/.dsh/plugins/dsh-multimodal/`，在 web profile 的 `~/.dsh/profiles/web/cordis.patch.yml` 的 `- insert:` 数组加：
 
 ```yaml
-- id: global-multimodal-host
-  name: file:///C:/Users/<you>/.dsh/plugins/dsh-global-multimodal/index.mjs
+- id: multimodal-host
+  name: file:///C:/Users/<you>/.dsh/plugins/dsh-multimodal/index.mjs
 ```
 
 重启 `dsh web` 生效。
@@ -42,17 +42,17 @@ corepack pnpm dsh plugin --profile web add <github-url-of-this-repo>
 - **凭据**：火山方舟 API Key 分两个，写在 `~/.dsh/.credentials.yaml`：
   - `DSH_VISION_API_KEY` — 视觉模型
   - `DSH_GENERATION_API_KEY` — 生图模型
-- **模型/端点**：默认见 `index.mjs` 的 `DEFAULT_CONFIG`（vision `doubao-seed-2-1-pro-260628`、generation `doubao-seedream-5-0-260128`、baseUrl `https://ark.cn-beijing.volces.com/api/v3`）。运行时配置写在插件目录的 `global-multimodal-config.json`（首次运行自动用默认生成），也可在 web UI「设置 → 多模态」改。
+- **模型/端点**：默认见 `index.mjs` 的 `DEFAULT_CONFIG`（vision `doubao-seed-2-1-pro-260628`、generation `doubao-seedream-5-0-260128`、baseUrl `https://ark.cn-beijing.volces.com/api/v3`）。运行时配置写在插件目录的 `global-multimodal-config.json`（首次运行自动用默认生成），需要换模型/端点时直接编辑该文件。
 - 本开源包**不含** `global-multimodal-config.json` 与凭据，首次运行用默认配置。
 
 ## 依赖
 
-- **官方 client 包** `@deepseek-ai/dsh-client-ui-doubao-multimodal`（harness 自带）：渲染 `generate_image`/`show_image` 的 tool-call 卡（`GenerateImageRow`）与 turn-tail 图集（`TurnImages`）。本 host 插件只负责工具执行与适配，UI 渲染走官方 client 包。
 - **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，发火山方舟 `chat/completions`（vision）与 `images/generations`（generate_image）请求。无需额外依赖，标准 Node 内置 `fetch`。
+- **图片渲染（可选）**：`generate_image`/`show_image` 的工具卡内联图（`GenerateImageRow`）与 turn-tail 图集（`TurnImages`）由配套 client 插件渲染（注册 `tool.call.toolview` 与 `conversation.chat.turnTail`），该组件**不在本仓库**。未安装时 `vision` 的文本结果不受影响，工具结果中的图片以通用卡片显示（附件引用完整，模型可正常引用）。
 
 ## 已知问题
 
-- **turn-tail 图集留白**：官方 `ui-doubao-multimodal` 的 `GenerateImageRow.module.css` 里 `.row` 是 flex column，默认 `align-items:stretch` 把 `<img>` 撑满宽，叠加 `max-height` + `object-fit:contain` 造成固定比例框留白。修复（`.image` 加 `align-self:flex-start`）在 harness 官方源码内，建议提 PR 给 `deepseek-ai/deepseek-harness` 上游，不打包进本插件。
+- turn-tail 图集留白（竖图/方图左右留白）在配套 client 组件（不在本仓库）的 `GenerateImageRow.module.css` 内：`.row` 是 flex column，默认 `align-items:stretch` 把 `<img>` 撑满宽，需给 `.image` 加 `align-self: flex-start`。
 - 参考图尺寸解析覆盖 PNG/JPEG/GIF；WebP 参考图读不到尺寸时 fallback 回档位（保持原行为）。
 
 ## License
