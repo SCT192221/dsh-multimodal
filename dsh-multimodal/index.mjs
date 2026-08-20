@@ -343,6 +343,18 @@ export function apply(ctx) {
     config: () => loadConfig(),
   })
 
+  // The attachment store's per-side admission limit (maxImageDimension). Newer
+  // harness releases default it to 2000px, which generated 2K/3K images exceed;
+  // older releases expose no such limit and this returns undefined so all
+  // limit-aware code paths stay inert.
+  function attachmentMaxSide() {
+    const limit = ctx.attachments?.imageLimits?.maxImageDimension
+    return typeof limit === 'number' && limit > 0 ? limit : undefined
+  }
+
+  // Human-readable pointer for limit-exceeded messages: how to raise the cap.
+  const limitHint = (limit) => `可在 ~/.dsh/settings.yaml 中为 attachment-local 服务调大 maxImageDimension（当前上限 ${limit}px，建议 4096）后重启 dsh web`
+
   function workspaceBase(exec) {
     const cwd = exec?.agent?.session?.header?.cwd
     if (typeof cwd === 'string' && cwd) return cwd
@@ -698,6 +710,7 @@ export function apply(ctx) {
       '- 生图/改图使用 generate_image。省略 references 时，它会自动使用本会话最近一次粘贴/发送的图片作为参考；没有图片时执行文生图。',
       '- 在原生/标准工具模式中可直接调用这两个工具。若当前只有 run_code 可直接调用（Code Mode），必须在 run_code 程序内使用 await tools.vision({...}) 或 await tools.generate_image({...})；不要直接发起 vision/generate_image 工具调用。',
       '- 一次成功调用后直接使用结果，不要反复识别、重试或额外验收。',
+      '- generate_image 结果里若出现 files 列表（图片超过 harness 附件尺寸上限未能内联展示），说明生成已成功、文件已保存，直接把路径和调大 attachment-local maxImageDimension 的建议转告用户即可，不要重试生成。',
       '- 脚本生成图表、截图等本地图片文件，用 show_image(path) 把图片直接展示在对话输出里（多张用 paths 列表一次展示）；不要只描述文件路径。',
     ].join('\n'),
   }))
@@ -760,12 +773,27 @@ export function apply(ctx) {
             },
           },
           prompt: { type: 'string' },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '已生成但因超过 harness 附件尺寸/字节上限而未能内联展示的图片文件路径。',
+          },
         },
         required: ['images', 'prompt'],
         additionalProperties: false,
       },
       render: (_args, value) => {
-        const blocks = [{ type: 'text', text: `已生成 ${Array.isArray(value?.images) ? value.images.length : 0} 张图片。` }]
+        const images = Array.isArray(value?.images) ? value.images : []
+        const files = Array.isArray(value?.files) ? value.files : []
+        const blocks = []
+        if (files.length > 0) {
+          const limit = attachmentMaxSide()
+          const reason = limit !== undefined ? `单边像素上限（${limit}px）` : '限制（尺寸或字节数）'
+          const hint = limit !== undefined ? limitHint(limit) : '可调大 ~/.dsh/settings.yaml 中 attachment-local 的 maxImageDimension / maxImageBytes 后重启 dsh web'
+          blocks.push({ type: 'text', text: `已生成 ${images.length + files.length} 张图片：${images.length} 张内联展示；${files.length} 张超过 harness 附件${reason}未能内联展示，文件已保存到 ${files.join('、')}。${hint}` })
+        } else {
+          blocks.push({ type: 'text', text: `已生成 ${images.length} 张图片。` })
+        }
         for (const image of Array.isArray(value?.images) ? value.images : []) {
           blocks.push({ type: 'image', attachment: { attachmentId: image.attachmentId, mediaType: image.mediaType, ...image.width !== undefined ? { width: image.width } : {}, ...image.height !== undefined ? { height: image.height } : {}, ...image.bytes !== undefined ? { bytes: image.bytes } : {}, ...image.name !== undefined ? { name: image.name } : {} } })
         }
@@ -784,16 +812,26 @@ export function apply(ctx) {
       const outputTarget = await ctx.fs.resolve(`${workspaceBase(exec)}/imgs`)
       const result = await runHelper({ kind: 'gen', apiKey, baseUrl: config.generationBaseUrl, model: config.generationModel, prompt: args.prompt, references, size: resolveGenSize(args.size, references), count: Math.min(Math.max(args.count || 1, 1), 4), outDir: ctx.fs.processPath(outputTarget), timeoutMs: 180000 }, exec?.signal)
       const images = []
+      const files = []
       for (let index = 0; index < result.images.length; index += 1) {
         const generated = result.images[index]
-        const ref = await ctx.attachments.saveImage({ data: base64ToBytes(generated.base64), mediaType: generated.mime, name: `generated-${index + 1}` })
-        const image = { attachmentId: String(ref.attachmentId), mediaType: ref.mediaType, name: ref.name || `generated-${index + 1}` }
-        if (Number.isInteger(ref.width)) image.width = ref.width
-        if (Number.isInteger(ref.height)) image.height = ref.height
-        if (Number.isInteger(ref.bytes)) image.bytes = ref.bytes
-        images.push(image)
+        try {
+          const ref = await ctx.attachments.saveImage({ data: base64ToBytes(generated.base64), mediaType: generated.mime, name: `generated-${index + 1}` })
+          const image = { attachmentId: String(ref.attachmentId), mediaType: ref.mediaType, name: ref.name || `generated-${index + 1}` }
+          if (Number.isInteger(ref.width)) image.width = ref.width
+          if (Number.isInteger(ref.height)) image.height = ref.height
+          if (Number.isInteger(ref.bytes)) image.bytes = ref.bytes
+          images.push(image)
+        } catch {
+          // The image generated fine and its file is already written to the
+          // workspace imgs/ dir; only the attachment store rejected it (per-
+          // side pixel cap on newer harnesses, or the byte cap). Degrade to a
+          // path listing instead of failing the whole call, so the model does
+          // not retry the generation in a loop.
+          files.push(generated.path)
+        }
       }
-      return { images, prompt: args.prompt }
+      return { images, files, prompt: args.prompt }
     },
   }))
 
@@ -864,6 +902,16 @@ export function apply(ctx) {
         const info = await ctx.fs.stat(target)
         if (!info) throw new Error(`图片文件不存在: ${source}`)
         const bytes = await ctx.fs.readBytes(target, exec?.signal, 20 * 1024 * 1024)
+        // Pre-check against the harness attachment per-side cap (newer
+        // harnesses default it to 2000px) so the failure names the actual
+        // dimensions and the way out, instead of the store's generic rejection.
+        const maxSide = attachmentMaxSide()
+        if (maxSide !== undefined) {
+          const dim = readImageSizeFromDataUrl(`data:${mediaType};base64,${bytesToBase64(bytes)}`)
+          if (dim && Math.max(dim.width, dim.height) > maxSide) {
+            throw new Error(`图片 ${dim.width}×${dim.height} 超过 harness 附件单边像素上限 ${maxSide}px，无法展示。${limitHint(maxSide)}，或先缩小图片后再展示`)
+          }
+        }
         const ref = await ctx.attachments.saveImage({ data: bytes, mediaType, name: source.replace(/^.*[\\\/]/, '') })
         const image = { attachmentId: String(ref.attachmentId), mediaType: ref.mediaType, name: ref.name || source.replace(/^.*[\\\/]/, '') }
         if (Number.isInteger(ref.width)) image.width = ref.width

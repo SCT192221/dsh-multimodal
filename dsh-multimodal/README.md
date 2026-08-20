@@ -64,6 +64,23 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 
 - 参考图尺寸解析覆盖 PNG/JPEG/GIF；WebP 参考图读不到尺寸时 fallback 回档位（保持原行为）。
 
+## harness 附件尺寸上限（重要）
+
+新版 harness 的附件存储默认限制**单边 2000px**（`attachment-local` 服务的 `maxImageDimension`，引入原因是模型路由会拒绝多图请求中超 2000px 的历史图片；旧版 harness 无此限制）。本插件默认生成 2K/3K 尺寸，必然超过该上限，因此：
+
+- **generate_image**：生成照常成功、文件照常写入 `<workspace>/imgs/`；超限图片无法内联展示时，结果降级为返回文件路径（`files` 字段）并附配置提示——**不会**让工具调用失败，模型也不会因此重试。
+- **show_image**：展示超限图片时报错并给出实际尺寸、上限值与配置方法。
+- 贴图本身也受此限制（harness 层行为）：单边超 2000px 的图会被拒入会话。
+
+要内联展示 2K/3K 原尺寸，把 `~/.dsh/settings.yaml` 里 `attachment-local` 的上限调大后重启 `dsh web`：
+
+```yaml
+attachment-local:
+  maxImageDimension: 4096   # 3K 档最大单边 4704，需全覆盖可设 4800
+```
+
+> 注意：调大后，会话中携带多张大图时可能触发模型路由的图片尺寸限制（该上限存在的原始原因），单图或少量图场景一般无碍。
+
 ## License
 
 MIT
