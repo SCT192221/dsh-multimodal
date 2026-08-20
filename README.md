@@ -23,6 +23,7 @@ dsh-multimodal/
 │   ├── lib/                     # 构建产物（已提交，装完即用）
 │   ├── package.json
 │   └── README.md
+├── patches/                     # harness 补丁（贴图识别所需，见安装第 3 步）
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -53,6 +54,17 @@ corepack pnpm dsh plugin --profile web add github:SCT192221/dsh-multimodal#path:
 > 包内已提交构建产物 `lib/` 且无 prepare 脚本，不会触发 pnpm 11 的 git-allowBuilds 闸门。
 
 两步都完成后重启 `dsh web` 生效。
+
+### 3. harness 补丁（贴图识别所需）
+
+官方 harness 的模态守卫会在纯文本模型的会话里拒绝图片输入（「当前模型不支持图片，请切换支持图片的模型」），需再打一个小补丁才能贴图识图：
+
+```sh
+# 在 harness 源码树根（packages/ 的上级）执行
+git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
+```
+
+不打补丁时贴图会被拒，但 `vision` 传显式路径/URL、文生图、`show_image` 均正常。原理与手动改法详见 `dsh-multimodal/README.md`。
 
 ## 配置凭据
 

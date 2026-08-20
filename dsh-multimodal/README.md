@@ -33,6 +33,20 @@ file:// 挂载（host 唯一支持的安装方式）：
 
 > 不走 pnpm 依赖安装是有意的：运行时配置 `global-multimodal-config.json` 写在插件目录，放 `~/.dsh/plugins/` 才不会被 profile 重装清掉。host 侧的服务依赖由 `index.mjs` 的 `export const inject` 声明，无需 package.json 元数据。
 
+## 必需的 harness 补丁：modality guard 豁免
+
+官方 harness 的 api-proxy 有模态守卫：纯文本模型的会话里粘贴/发送图片会被直接拒绝（提示「当前模型不支持图片，请切换支持图片的模型」），图片进不了会话，vision 也就读不到它。要启用「贴图 → vision 自动识别」链路，需给 harness 源码树打上本仓库附带的小补丁：
+
+```sh
+# 在 harness 源码树根（packages/ 的上级）执行
+git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
+```
+
+补丁做的事：api-proxy 在图片准入守卫（两处：prompt 提交与模型切换）追加 `ctx.get('globalMultimodal').visionEnabled()` 检查——本插件挂载且视觉通道启用时放行图片进入会话；图片随后由插件的 llm/stream 适配替换为文字提示，不会真的发给文本模型。守卫其余行为不变（未挂载本插件时与原版完全一致）。
+
+- **不打补丁的降级行为**：贴图被 harness 拒绝；`vision` 仍可通过 `images` 参数识别本地路径 / URL / data URI 的图片；文生图与 `show_image` 完全不受影响。
+- 补丁基于上游 master（2026-08-20）验证。harness 升级后若 `git apply` 因上下文漂移失败，手动改法：在 `packages/host/apiproxy/src/api-proxy.ts` 找到两处 `inputModalities !== undefined && !…includes('image')` 守卫条件，各追加 `&& !multimodalVisionActive(ctx)`，再把 patch 文件里的 `multimodalVisionActive` 函数复制到该文件顶部。
+
 ## 配置
 
 - **凭据**：视觉与生图两个通道各一个 API Key，写在 `~/.dsh/.credentials.yaml`：

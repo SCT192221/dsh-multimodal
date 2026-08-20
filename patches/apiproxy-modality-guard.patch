@@ -1,0 +1,46 @@
+diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
+--- a/packages/host/apiproxy/src/api-proxy.ts
++++ b/packages/host/apiproxy/src/api-proxy.ts
+@@ -121,6 +121,24 @@ const COLD_SUMMARY_BATCH_SIZE = 16
+ /** Default maximum artifact size eligible for one cold blankness read. */
+ export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
+
++/**
++ * A deployment may mount a global multimodal vision channel (for example the
++ * out-of-tree `dsh-multimodal` profile plugin) that gives a text-only model
++ * image understanding indirectly: it registers a `vision` tool and replaces
++ * image blocks with a text note at the llm/stream boundary, directing the
++ * model to call `vision`. While that channel is active, admitting an image
++ * prompt for a text-only model is safe — the image never reaches the model
++ * directly — and is the only way a user can paste an image for the vision
++ * tool to read. Such a plugin exposes its state on `ctx` under the
++ * `globalMultimodal` key with a `visionEnabled()` predicate; when the key is
++ * absent (no plugin mounted), this returns false and the modality guard below
++ * behaves exactly as before.
++ */
++function multimodalVisionActive(ctx: Context): boolean {
++  const multimodal = ctx.get('globalMultimodal')
++  return typeof multimodal?.visionEnabled === 'function' && multimodal.visionEnabled() === true
++}
++
+ /** Conversation message event types (the pagination counting unit). */
+ const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
+
+@@ -2212,7 +2230,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+               .some(message => contentHasImage(message.content))
+             if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
+               const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
+-              if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
++              if (info.inputModalities !== undefined && !info.inputModalities.includes('image') && !multimodalVisionActive(ctx)) {
+                 return err(request, {
+                   code: 'model-unavailable',
+                   message: `Model "${resolved.model}" does not accept image input, but this session already contains images; select an image-capable model.`,
+@@ -2401,7 +2419,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+             if (hasImage) {
+               const current = selectionFor(agent).current
+               const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
+-              if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
++              if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image') && !multimodalVisionActive(ctx)) {
+                 return err(request, {
+                   code: 'attachment-error',
+                   message: `Model "${current.model}" does not support image input.`,
