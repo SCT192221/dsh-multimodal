@@ -1,7 +1,7 @@
 {
   "name": "dsh-multimodal-client",
   "description": "Multimodal client plugin for DeepSeek Harness: inline image rows for generate_image/show_image tool cards, a turn-tail image gallery, and the multimodal settings page. Companion to the dsh-multimodal host plugin.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
