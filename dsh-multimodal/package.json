@@ -8,11 +8,6 @@
   "scripts": {
     "check": "node --check index.mjs"
   },
-  "keywords": ["deepseek-harness", "dsh", "multimodal", "vision", "ocr", "image-generation", "doubao", "seedream", "volcengine-ark"],
-  "license": "MIT",
-  "dsh": {
-    "host": {
-      "inject": ["tools", "subprocess", "fs", "attachments", "sessionQuery", "webServer", "credentials", "systemPrompt", "llm"]
-    }
-  }
+  "keywords": ["deepseek-harness", "dsh", "multimodal", "vision", "ocr", "image-generation", "doubao", "seedream", "openai-compatible"],
+  "license": "MIT"
 }

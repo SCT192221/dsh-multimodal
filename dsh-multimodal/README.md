@@ -20,13 +20,7 @@ DeepSeek Harness 的多模态 host 插件：给文本模型补全视觉与生图
 
 ## 安装
 
-### 方式 A：dsh plugin add（推荐，待 package.json 的 dsh 字段按规范确认后）
-
-```sh
-corepack pnpm dsh plugin --profile web add <github-url-of-this-repo>
-```
-
-### 方式 B：file:// 挂载（当前可用）
+file:// 挂载（host 唯一支持的安装方式）：
 
 把 `index.mjs` + `multimodal-helper.cjs` 放到 `~/.dsh/plugins/dsh-multimodal/`，在 web profile 的 `~/.dsh/profiles/web/cordis.patch.yml` 的 `- insert:` 数组加：
 
@@ -36,6 +30,8 @@ corepack pnpm dsh plugin --profile web add <github-url-of-this-repo>
 ```
 
 重启 `dsh web` 生效。
+
+> 不走 pnpm 依赖安装是有意的：运行时配置 `global-multimodal-config.json` 写在插件目录，放 `~/.dsh/plugins/` 才不会被 profile 重装清掉。host 侧的服务依赖由 `index.mjs` 的 `export const inject` 声明，无需 package.json 元数据。
 
 ## 配置
 
