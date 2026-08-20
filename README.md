@@ -66,7 +66,7 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 
 不打补丁时贴图会被拒，但 `vision` 传显式路径/URL、文生图、`show_image` 均正常。原理与手动改法详见 `dsh-multimodal/README.md`。
 
-> **新版 harness 用户注意**：附件存储默认限制单边 2000px（`maxImageDimension`），2K/3K 生成图会超限。插件已做降级处理（生成照常、文件照存、结果返回路径与配置提示，工具不会报错死循环）；要内联展示原尺寸，在 `~/.dsh/settings.yaml` 里调大 `attachment-local` 的 `maxImageDimension`（如 4096）。详见 `dsh-multimodal/README.md` 的「harness 附件尺寸上限」。
+> **新版 harness 用户注意**：附件存储默认限制单边 2000px（`maxImageDimension`），2K/3K 生成图会超限。插件已做优雅降级（生成照常、文件照存、结果返回路径与配置提示，工具不会报错死循环）。想要 2K/3K 原图内联展示，可调大 `~/.dsh/settings.yaml` 里 `attachment-local` 的 `maxImageDimension`（如 4096）——调与不调的取舍详见 `dsh-multimodal/README.md` 的「harness 附件尺寸上限与你的选择」。
 
 ## 配置凭据
 
