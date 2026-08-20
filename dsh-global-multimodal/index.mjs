@@ -679,7 +679,7 @@ export function apply(ctx) {
       '- 生图/改图使用 generate_image。省略 references 时，它会自动使用本会话最近一次粘贴/发送的图片作为参考；没有图片时执行文生图。',
       '- 在原生/标准工具模式中可直接调用这两个工具。若当前只有 run_code 可直接调用（Code Mode），必须在 run_code 程序内使用 await tools.vision({...}) 或 await tools.generate_image({...})；不要直接发起 vision/generate_image 工具调用。',
       '- 一次成功调用后直接使用结果，不要反复识别、重试或额外验收。',
-      '- 脚本生成图表、截图等本地图片文件，用 show_image(path) 把图片直接展示在对话输出里；不要只描述文件路径。',
+      '- 脚本生成图表、截图等本地图片文件，用 show_image(path) 把图片直接展示在对话输出里（多张用 paths 列表一次展示）；不要只描述文件路径。',
     ].join('\n'),
   }))
 
@@ -784,13 +784,13 @@ export function apply(ctx) {
   // renders them inline under the tool call.
   ctx.effect(() => ctx.tools.register({
     name: 'show_image',
-    description: '把本地图片文件（如脚本生成的图表、截图）直接展示在对话输出里。传入本地绝对路径。',
+    description: '把本地图片文件（如脚本生成的图表、截图）直接展示在对话输出里。传入本地绝对路径；多张图片用 paths 列表一次展示。',
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: '本地图片文件的绝对路径，支持 PNG/JPEG/WebP/GIF。' },
+        path: { type: 'string', description: '本地图片文件的绝对路径，支持 PNG/JPEG/WebP/GIF。与 paths 可同时使用。' },
+        paths: { type: 'array', items: { type: 'string' }, description: '可选：多张本地图片的绝对路径列表，一次展示多图。' },
       },
-      required: ['path'],
       additionalProperties: false,
     },
     output: {
@@ -806,9 +806,9 @@ export function apply(ctx) {
               additionalProperties: false,
             },
           },
-          path: { type: 'string' },
+          paths: { type: 'array', items: { type: 'string' } },
         },
-        required: ['images', 'path'],
+        required: ['images', 'paths'],
         additionalProperties: false,
       },
       render: (_args, value) => {
@@ -826,18 +826,30 @@ export function apply(ctx) {
     },
     timeoutMs: 60000,
     async execute(args, exec) {
-      const source = typeof args.path === 'string' ? args.path.trim() : ''
-      if (source === '') throw new Error('path 不能为空')
-      const mediaType = mimeForPath(source)
-      const target = await ctx.fs.resolve(source)
-      const info = await ctx.fs.stat(target)
-      if (!info) throw new Error(`图片文件不存在: ${source}`)
-      const bytes = await ctx.fs.readBytes(target, exec?.signal, 20 * 1024 * 1024)
-      const ref = await ctx.attachments.saveImage({ data: bytes, mediaType, name: source.replace(/^.*[\\\/]/, '') })
-      const image = { attachmentId: String(ref.attachmentId), mediaType: ref.mediaType, name: ref.name || source.replace(/^.*[\\\/]/, '') }
-      if (Number.isInteger(ref.width)) image.width = ref.width
-      if (Number.isInteger(ref.height)) image.height = ref.height
-      if (Number.isInteger(ref.bytes)) image.bytes = ref.bytes
-      return { images: [image], path: source }
+      // Collect paths from both `path` (single) and `paths` (list); dedupe
+      // while keeping the original order.
+      const sources = []
+      if (typeof args.path === 'string' && args.path.trim() !== '') sources.push(args.path.trim())
+      for (const value of Array.isArray(args.paths) ? args.paths : []) {
+        const source = String(value || '').trim()
+        if (source !== '') sources.push(source)
+      }
+      const unique = [...new Set(sources)]
+      if (unique.length === 0) throw new Error('请提供 path（单张）或 paths（多张）本地图片路径')
+      const images = []
+      for (const source of unique) {
+        const mediaType = mimeForPath(source)
+        const target = await ctx.fs.resolve(source)
+        const info = await ctx.fs.stat(target)
+        if (!info) throw new Error(`图片文件不存在: ${source}`)
+        const bytes = await ctx.fs.readBytes(target, exec?.signal, 20 * 1024 * 1024)
+        const ref = await ctx.attachments.saveImage({ data: bytes, mediaType, name: source.replace(/^.*[\\\/]/, '') })
+        const image = { attachmentId: String(ref.attachmentId), mediaType: ref.mediaType, name: ref.name || source.replace(/^.*[\\\/]/, '') }
+        if (Number.isInteger(ref.width)) image.width = ref.width
+        if (Number.isInteger(ref.height)) image.height = ref.height
+        if (Number.isInteger(ref.bytes)) image.bytes = ref.bytes
+        images.push(image)
+      }
+      return { images, paths: unique }
     },
   }))}

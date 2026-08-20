@@ -7,7 +7,7 @@ DeepSeek Harness 的多模态 host 插件：给文本模型补全视觉与生图
 - **vision** — 识图 / OCR / 图表理解 / 多图比较 / 视觉问答。省略 `images` 时自动读取本会话最近一次粘贴或发送的图片（跨轮可读）。
 - **generate_image** — 文生图 / 参考图编辑（P图）。省略 `references` 时自动用本会话最近一次图片作参考。
   - **参考图比例匹配**：有参考图且未显式传 `WIDTHxHEIGHT` 时，读参考图宽高比，从豆包 Seedream 该档（2K/3K）官方推荐像素表里按对数距离选最近的 `WIDTHxHEIGHT` 传 API——新图严格匹配参考图比例，不再固定 2K 出方图。
-- **show_image** — 把本地图片文件（脚本生成的图表、截图等）直接展示在对话输出里。对纯文本模型也可用（无 `read_image` 的 image-capable 闸）。
+- **show_image** — 把本地图片文件（脚本生成的图表、截图等）直接展示在对话输出里。传 `path`（单张）或 `paths`（多张列表）。对纯文本模型也可用（无 `read_image` 的 image-capable 闸）。
 - **llm/stream text-only 适配** — 纯文本模型收到带图消息时，在 adapter 边界把图片替换为内联提示（`[本条消息含 N 张图片，请调用 vision 工具]`），仅改模型请求、不碰 durable 日志，图片在浏览器照常显示。
 
 ## 工具
@@ -16,7 +16,7 @@ DeepSeek Harness 的多模态 host 插件：给文本模型补全视觉与生图
 |------|------|----------|
 | `vision` | 识图/问答 | `prompt`（必填）、`images`（可省，自动读最近图）、`detail`、`max_tokens` |
 | `generate_image` | 生图/改图 | `prompt`（必填）、`references`（可省，自动用最近图）、`size`（默认 2K）、`count`（1-4） |
-| `show_image` | 展示本地图 | `path`（本地绝对路径） |
+| `show_image` | 展示本地图 | `path`（单张，本地绝对路径）、`paths`（多张列表，二选一或同时） |
 
 ## 安装
 
