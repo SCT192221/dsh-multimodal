@@ -203,10 +203,11 @@ function requestMessagesHaveImage(messages) {
 
 function stripImagesFromBlocks(blocks, noteText) {
   let removed = 0
+  let removedTopLevel = 0
   const kept = []
   for (const block of blocks) {
     if (!block || typeof block !== 'object') { kept.push(block); continue }
-    if (block.type === 'image') { removed += 1; continue }
+    if (block.type === 'image') { removed += 1; removedTopLevel += 1; continue }
     if (block.type === 'tool-result' && contentHasImageDeep(block.content)) {
       const inner = stripImagesFromBlocks(block.content, noteText)
       removed += inner.removed
@@ -215,7 +216,21 @@ function stripImagesFromBlocks(blocks, noteText) {
     }
     kept.push(block)
   }
-  if (removed > 0) kept.push({ type: 'text', text: noteText(removed) })
+  // A top-level text note is only allowed on messages that carry no
+  // tool-result blocks. On the wire, tool-result blocks expand into
+  // role:'tool' messages that must IMMEDIATELY follow the assistant
+  // tool_calls message; a sibling text block would be serialized as an
+  // interposed user message, which strict OpenAI-compatible APIs (the
+  // official DeepSeek API among them) reject with "insufficient tool
+  // messages following tool_calls". Nested removals carry their note
+  // inside the tool-result content instead, which lands within the tool
+  // message and cannot break the pairing.
+  if (
+    removedTopLevel > 0
+    && !kept.some((block) => block && typeof block === 'object' && block.type === 'tool-result')
+  ) {
+    kept.push({ type: 'text', text: noteText(removedTopLevel) })
+  }
   return { removed, blocks: kept }
 }
 
