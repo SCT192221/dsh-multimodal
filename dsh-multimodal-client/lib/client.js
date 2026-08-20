@@ -17,8 +17,8 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var GenerateImageRow_module_css_default = {
-			"loading": "oa5J6G_loading",
 			"row": "oa5J6G_row",
+			"loading": "oa5J6G_loading",
 			"image": "oa5J6G_image",
 			"muted": "oa5J6G_muted"
 		};
@@ -126,18 +126,23 @@ window.__ModuleLoader__.load({
 		});
 		//#endregion
 		//#region lib/types/client/turn-images.js
-		/** Recursively collect image attachment refs from content blocks. */
-		function collectImageRefs(content) {
-			const refs = [];
-			for (const block of content) {
-				if (!block || typeof block !== "object") continue;
-				const b = block;
-				if (b.type === "image" && b.attachment !== void 0 && typeof b.attachment === "object") refs.push(b.attachment);
-				else if (b.type === "tool-result" && Array.isArray(b.content)) refs.push(...collectImageRefs(b.content));
+		/** Read one presentationMeta-shaped object's declared images and final flag. */
+		function readMeta(meta) {
+			if (meta === null || typeof meta !== "object") return {
+				images: [],
+				final: false
+			};
+			const m = meta;
+			const images = [];
+			if (Array.isArray(m.images)) {
+				for (const image of m.images) if (image && typeof image === "object" && typeof image.attachmentId === "string") images.push(image);
 			}
-			return refs;
+			return {
+				images,
+				final: m.final === true
+			};
 		}
-		/** Turn-local image accumulator; publishes no view Node. */
+		/** Turn-local final-image accumulator; publishes no view Node. */
 		const turnImagesDefinition = {
 			kind: "turnImages",
 			match: (event) => {
@@ -162,17 +167,12 @@ window.__ModuleLoader__.load({
 				if (match.event.type !== "tool/result") return context.state;
 				const message = match.event.data.message;
 				if (message === void 0) return context.state;
-				const contentRefs = collectImageRefs(message.content ?? []);
 				const meta = message.meta;
-				const metaRefs = [];
-				if (meta && Array.isArray(meta.images)) {
-					for (const image of meta.images) if (image && typeof image === "object" && typeof image.attachmentId === "string") metaRefs.push(image);
-				}
-				const all = [...contentRefs, ...metaRefs];
-				if (all.length === 0) return context.state;
+				const { images, final } = readMeta(meta);
+				if (!final || images.length === 0) return context.state;
 				const seen = new Set(context.state.images.map((r) => String(r.attachment.attachmentId)));
 				const additions = [];
-				for (const ref of all) {
+				for (const ref of images) {
 					const id = String(ref.attachmentId);
 					if (seen.has(id)) continue;
 					seen.add(id);
@@ -195,9 +195,9 @@ window.__ModuleLoader__.load({
 			}
 		};
 		/**
-		* Claim the turn-tail chain only when the turn produced images.
+		* Claim the turn-tail chain only when the turn produced final images.
 		* @param owner - Turn-tail owner currency for the closing assistant.
-		* @returns Image refs as the component's match, or null to decline.
+		* @returns Final image refs as the component's match, or null to decline.
 		*/
 		function selectTurnImages(owner) {
 			const data = owner.turn.data.get("turnImages");
@@ -218,29 +218,29 @@ window.__ModuleLoader__.load({
 		}
 		var MultimodalSettingsSection_module_css_default = {
 			"section": "HI6d2W_section",
-			"clearButton": "HI6d2W_clearButton",
-			"message": "HI6d2W_message",
-			"switchLabel": "HI6d2W_switchLabel",
-			"switchText": "HI6d2W_switchText",
+			"headingBlock": "HI6d2W_headingBlock",
+			"cardHeader": "HI6d2W_cardHeader",
+			"switchTrack": "HI6d2W_switchTrack",
 			"intro": "HI6d2W_intro",
+			"field": "HI6d2W_field",
+			"fields": "HI6d2W_fields",
+			"switchLabel": "HI6d2W_switchLabel",
+			"loading": "HI6d2W_loading",
 			"input": "HI6d2W_input",
+			"switchText": "HI6d2W_switchText",
+			"actions": "HI6d2W_actions",
+			"secondaryButton": "HI6d2W_secondaryButton",
+			"card": "HI6d2W_card",
+			"cardSubtitle": "HI6d2W_cardSubtitle",
+			"switchInput": "HI6d2W_switchInput",
+			"message": "HI6d2W_message",
+			"clearButton": "HI6d2W_clearButton",
+			"heading": "HI6d2W_heading",
+			"cardTitle": "HI6d2W_cardTitle",
+			"grid": "HI6d2W_grid",
 			"fieldLabel": "HI6d2W_fieldLabel",
 			"primaryButton": "HI6d2W_primaryButton",
-			"headingBlock": "HI6d2W_headingBlock",
-			"actions": "HI6d2W_actions",
-			"switchTrack": "HI6d2W_switchTrack",
-			"switchInput": "HI6d2W_switchInput",
-			"cardHeader": "HI6d2W_cardHeader",
-			"loading": "HI6d2W_loading",
-			"heading": "HI6d2W_heading",
-			"field": "HI6d2W_field",
-			"card": "HI6d2W_card",
-			"fields": "HI6d2W_fields",
-			"switchThumb": "HI6d2W_switchThumb",
-			"grid": "HI6d2W_grid",
-			"cardTitle": "HI6d2W_cardTitle",
-			"secondaryButton": "HI6d2W_secondaryButton",
-			"cardSubtitle": "HI6d2W_cardSubtitle"
+			"switchThumb": "HI6d2W_switchThumb"
 		};
 		//#endregion
 		//#region lib/types/client/MultimodalSettingsSection.js

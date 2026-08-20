@@ -814,7 +814,11 @@ export function apply(ctx) {
         }
         return blocks
       },
-      presentationMeta: (_args, value) => ({ images: Array.isArray(value?.images) ? value.images : [] }),
+      // `final: true` marks these images as deliverables of the turn: the
+      // client turn-tail gallery shows only final images, so intermediate
+      // artifacts (show_image thumbnails, retries the model abandoned) never
+      // pollute the closing gallery.
+      presentationMeta: (_args, value) => ({ images: Array.isArray(value?.images) ? value.images : [], final: true }),
     },
     timeoutMs: 360000,
     async execute(args, exec) {
@@ -896,7 +900,10 @@ export function apply(ctx) {
         }
         return blocks
       },
-      presentationMeta: (_args, value) => ({ images: Array.isArray(value?.images) ? value.images : [] }),
+      // `final: false` keeps show_image output out of the turn-tail gallery:
+      // show_image is a display action (often of intermediate work), not a
+      // deliverable. Its images stay visible in their own tool-call card.
+      presentationMeta: (_args, value) => ({ images: Array.isArray(value?.images) ? value.images : [], final: false }),
     },
     timeoutMs: 60000,
     async execute(args, exec) {
