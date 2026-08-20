@@ -1,0 +1,18 @@
+{
+  "name": "dsh-global-multimodal",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness host plugin: vision (image recognition/OCR/QA) + generate_image (text-to-image and reference-image editing with aspect-ratio matching) + show_image (inline local image display), plus text-only-model image-strip adaptation at the llm/stream boundary.",
+  "type": "module",
+  "main": "index.mjs",
+  "files": ["index.mjs", "multimodal-helper.cjs"],
+  "scripts": {
+    "check": "node --check index.mjs"
+  },
+  "keywords": ["deepseek-harness", "dsh", "multimodal", "vision", "ocr", "image-generation", "doubao", "seedream", "volcengine-ark"],
+  "license": "MIT",
+  "dsh": {
+    "host": {
+      "inject": ["tools", "subprocess", "fs", "attachments", "sessionQuery", "webServer", "credentials", "systemPrompt", "llm"]
+    }
+  }
+}

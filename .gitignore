@@ -1,0 +1,23 @@
+# 运行时配置（首次运行生成，含用户私有端点/模型，勿提交）
+global-multimodal-config.json
+*-config.json
+
+# 凭据
+.credentials.yaml
+credentials*.yaml
+*.env
+
+# 依赖
+node_modules/
+
+# 构建产物
+lib/
+dist/
+
+# 编辑器/系统
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+.vscode/
+.idea/

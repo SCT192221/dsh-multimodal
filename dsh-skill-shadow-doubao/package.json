@@ -1,0 +1,18 @@
+{
+  "name": "dsh-skill-shadow-doubao",
+  "version": "0.1.0",
+  "description": "Shadows the doubao-multimodal skill inside DeepSeek Harness so it is not model- or user-invocable, forcing image tasks through the multimodal plugin instead. Harness-local only; other agents (claude/codex/...) are unaffected.",
+  "type": "module",
+  "main": "index.mjs",
+  "files": ["index.mjs"],
+  "scripts": {
+    "check": "node --check index.mjs"
+  },
+  "keywords": ["deepseek-harness", "dsh", "skill", "shadow", "disable", "doubao-multimodal"],
+  "license": "MIT",
+  "dsh": {
+    "host": {
+      "inject": ["skills"]
+    }
+  }
+}
