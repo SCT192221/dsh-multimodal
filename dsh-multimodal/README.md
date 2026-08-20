@@ -48,11 +48,10 @@ corepack pnpm dsh plugin --profile web add <github-url-of-this-repo>
 ## 依赖
 
 - **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，发火山方舟 `chat/completions`（vision）与 `images/generations`（generate_image）请求。无需额外依赖，标准 Node 内置 `fetch`。
-- **图片渲染（可选）**：`generate_image`/`show_image` 的工具卡内联图（`GenerateImageRow`）与 turn-tail 图集（`TurnImages`）由配套 client 插件渲染（注册 `tool.call.toolview` 与 `conversation.chat.turnTail`），该组件**不在本仓库**。未安装时 `vision` 的文本结果不受影响，工具结果中的图片以通用卡片显示（附件引用完整，模型可正常引用）。
+- **配套 client 插件**：同仓库的 [`dsh-multimodal-client`](../dsh-multimodal-client/) 渲染 `generate_image`/`show_image` 的工具卡内联图与 turn-tail 图集，并提供「设置 → 多模态」设置页。可选：未安装时 `vision` 的文本结果不受影响，工具结果中的图片以通用卡片显示（附件引用完整，模型可正常引用），配置需手编文件。
 
 ## 已知问题
 
-- turn-tail 图集留白（竖图/方图左右留白）在配套 client 组件（不在本仓库）的 `GenerateImageRow.module.css` 内：`.row` 是 flex column，默认 `align-items:stretch` 把 `<img>` 撑满宽，需给 `.image` 加 `align-self: flex-start`。
 - 参考图尺寸解析覆盖 PNG/JPEG/GIF；WebP 参考图读不到尺寸时 fallback 回档位（保持原行为）。
 
 ## License

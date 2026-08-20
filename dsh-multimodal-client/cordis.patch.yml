@@ -1,0 +1,10 @@
+# dsh-multimodal-client bundle patch.
+#
+# Auto-mounts this client plugin when installed through `dsh plugin add`
+# (the command reconciles dsh.profile.bundles and merges this insert row
+# into the profile boot, exactly like a manual cordis.patch.yml mount
+# line). If the profile already carries a manual mount row for this
+# package, remove it to avoid double-mounting.
+- insert:
+    - id: multimodal-client
+      name: dsh-multimodal-client

@@ -10,8 +10,8 @@ credentials*.yaml
 # 依赖
 node_modules/
 
-# 构建产物
-lib/
+# 构建中间产物（dsh-multimodal-client/lib 是发布产物，必须提交）
+*.tsbuildinfo
 dist/
 
 # 编辑器/系统
