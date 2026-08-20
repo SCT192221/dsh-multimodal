@@ -18,9 +18,9 @@ window.__ModuleLoader__.load({
 		}
 		var GenerateImageRow_module_css_default = {
 			"loading": "oa5J6G_loading",
-			"muted": "oa5J6G_muted",
 			"row": "oa5J6G_row",
-			"image": "oa5J6G_image"
+			"image": "oa5J6G_image",
+			"muted": "oa5J6G_muted"
 		};
 		//#endregion
 		//#region lib/types/client/GenerateImageRow.js
@@ -217,41 +217,41 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var MultimodalSettingsSection_module_css_default = {
-			"fieldLabel": "HI6d2W_fieldLabel",
-			"cardSubtitle": "HI6d2W_cardSubtitle",
-			"grid": "HI6d2W_grid",
 			"section": "HI6d2W_section",
-			"switchThumb": "HI6d2W_switchThumb",
-			"cardTitle": "HI6d2W_cardTitle",
-			"switchTrack": "HI6d2W_switchTrack",
-			"cardHeader": "HI6d2W_cardHeader",
+			"clearButton": "HI6d2W_clearButton",
+			"message": "HI6d2W_message",
+			"switchLabel": "HI6d2W_switchLabel",
+			"switchText": "HI6d2W_switchText",
+			"intro": "HI6d2W_intro",
+			"input": "HI6d2W_input",
+			"fieldLabel": "HI6d2W_fieldLabel",
 			"primaryButton": "HI6d2W_primaryButton",
 			"headingBlock": "HI6d2W_headingBlock",
-			"switchText": "HI6d2W_switchText",
-			"fields": "HI6d2W_fields",
-			"secondaryButton": "HI6d2W_secondaryButton",
-			"switchLabel": "HI6d2W_switchLabel",
-			"message": "HI6d2W_message",
-			"intro": "HI6d2W_intro",
-			"card": "HI6d2W_card",
-			"input": "HI6d2W_input",
-			"loading": "HI6d2W_loading",
-			"field": "HI6d2W_field",
-			"heading": "HI6d2W_heading",
+			"actions": "HI6d2W_actions",
+			"switchTrack": "HI6d2W_switchTrack",
 			"switchInput": "HI6d2W_switchInput",
-			"clearButton": "HI6d2W_clearButton",
-			"actions": "HI6d2W_actions"
+			"cardHeader": "HI6d2W_cardHeader",
+			"loading": "HI6d2W_loading",
+			"heading": "HI6d2W_heading",
+			"field": "HI6d2W_field",
+			"card": "HI6d2W_card",
+			"fields": "HI6d2W_fields",
+			"switchThumb": "HI6d2W_switchThumb",
+			"grid": "HI6d2W_grid",
+			"cardTitle": "HI6d2W_cardTitle",
+			"secondaryButton": "HI6d2W_secondaryButton",
+			"cardSubtitle": "HI6d2W_cardSubtitle"
 		};
 		//#endregion
 		//#region lib/types/client/MultimodalSettingsSection.js
 		/** Multimodal settings: independent visual and image-generation channels. */
 		const EMPTY_DRAFT = {
 			visionEnabled: true,
-			visionModel: "doubao-seed-2-1-pro-260628",
-			visionBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+			visionModel: "",
+			visionBaseUrl: "",
 			generationEnabled: true,
-			generationModel: "doubao-seedream-5-0-260128",
-			generationBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+			generationModel: "",
+			generationBaseUrl: "",
 			visionApiKey: "",
 			generationApiKey: ""
 		};
@@ -355,6 +355,9 @@ window.__ModuleLoader__.load({
 					[channel]: null
 				}));
 				try {
+					const model = (channel === "vision" ? draft.visionModel : draft.generationModel).trim();
+					const baseUrl = (channel === "vision" ? draft.visionBaseUrl : draft.generationBaseUrl).trim();
+					if ((channel === "vision" ? draft.visionEnabled : draft.generationEnabled) && (model === "" || baseUrl === "")) throw new Error("已启用的通道需填写模型 ID 与 Base URL");
 					const saved = await requestJson("/global-multimodal/config", {
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
@@ -538,6 +541,7 @@ window.__ModuleLoader__.load({
 										className: MultimodalSettingsSection_module_css_default.input,
 										value: model,
 										spellCheck: false,
+										placeholder: "填写模型 ID",
 										onChange: (event) => {
 											update(channel, vision ? "visionModel" : "generationModel", event.target.value);
 										}
@@ -552,6 +556,7 @@ window.__ModuleLoader__.load({
 										className: MultimodalSettingsSection_module_css_default.input,
 										value: baseUrl,
 										spellCheck: false,
+										placeholder: "填写 Base URL（OpenAI 兼容端点，如 https://api.example.com/v3）",
 										onChange: (event) => {
 											update(channel, vision ? "visionBaseUrl" : "generationBaseUrl", event.target.value);
 										}
@@ -589,7 +594,8 @@ window.__ModuleLoader__.load({
 							children: [(0, react_jsx_runtime.jsx)("button", {
 								className: MultimodalSettingsSection_module_css_default.secondaryButton,
 								type: "button",
-								disabled: operation !== null || loading,
+								disabled: operation !== null || loading || model.trim() === "" || baseUrl.trim() === "",
+								title: model.trim() === "" || baseUrl.trim() === "" ? "请先填写模型 ID 与 Base URL" : void 0,
 								onClick: () => {
 									test(channel);
 								},

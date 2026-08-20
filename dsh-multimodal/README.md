@@ -52,12 +52,12 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 - **凭据**：视觉与生图两个通道各一个 API Key，写在 `~/.dsh/.credentials.yaml`：
   - `DSH_VISION_API_KEY` — 视觉模型
   - `DSH_GENERATION_API_KEY` — 生图模型
-- **模型/端点**：两个通道的模型 ID 与 Base URL 均可配置，支持任何 OpenAI 兼容端点（Gemini、GPT、豆包等）。默认为火山方舟豆包（vision `doubao-seed-2-1-pro-260628`、generation `doubao-seedream-5-0-260128`、baseUrl `https://ark.cn-beijing.volces.com/api/v3`），见 `index.mjs` 的 `DEFAULT_CONFIG`。运行时配置写在插件目录的 `global-multimodal-config.json`（首次运行自动用默认生成），需要换模型/端点时直接编辑该文件。
-- 本开源包**不含** `global-multimodal-config.json` 与凭据，首次运行用默认配置。
+- **模型/端点**：两个通道的模型 ID 与 Base URL 均可配置，支持任何 OpenAI 兼容端点（Gemini、GPT、豆包等），**不预置任何默认值**——首次使用需先在设置页（或配置文件）填写，填好前工具调用会提示未配置。运行时配置写在插件目录的 `global-multimodal-config.json`（首次运行自动生成空配置）。
+- 本开源包**不含** `global-multimodal-config.json` 与凭据。
 
 ## 依赖
 
-- **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，向所配置的 OpenAI 兼容端点发 `chat/completions`（vision）与 `images/generations`（generate_image）请求，默认火山方舟豆包，可在配置中替换。无需额外依赖，标准 Node 内置 `fetch`。
+- **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，向所配置的 OpenAI 兼容端点发 `chat/completions`（vision）与 `images/generations`（generate_image）请求。无需额外依赖，标准 Node 内置 `fetch`。
 - **配套 client 插件**：同仓库的 [`dsh-multimodal-client`](../dsh-multimodal-client/) 渲染 `generate_image`/`show_image` 的工具卡内联图与 turn-tail 图集，并提供「设置 → 多模态」设置页。可选：未安装时 `vision` 的文本结果不受影响，工具结果中的图片以通用卡片显示（附件引用完整，模型可正常引用），配置需手编文件。
 
 ## 已知问题

@@ -27,13 +27,15 @@ interface Draft extends Omit<PublicConfig, 'credentials'> {
 
 type Operation = 'save' | 'test' | 'clear' | null
 
+// No vendor defaults: model and base URL start empty and must be filled in
+// with any OpenAI-compatible endpoint before the channel is usable.
 const DEFAULTS: Omit<PublicConfig, 'credentials'> = {
   visionEnabled: true,
-  visionModel: 'doubao-seed-2-1-pro-260628',
-  visionBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+  visionModel: '',
+  visionBaseUrl: '',
   generationEnabled: true,
-  generationModel: 'doubao-seedream-5-0-260128',
-  generationBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+  generationModel: '',
+  generationBaseUrl: '',
 }
 
 const EMPTY_DRAFT: Draft = { ...DEFAULTS, visionApiKey: '', generationApiKey: '' }
@@ -125,6 +127,12 @@ export function MultimodalSettingsSection(): React.ReactNode {
     setOperation(channel, 'save')
     setMessages((previous) => ({ ...previous, [channel]: null }))
     try {
+      const model = (channel === 'vision' ? draft.visionModel : draft.generationModel).trim()
+      const baseUrl = (channel === 'vision' ? draft.visionBaseUrl : draft.generationBaseUrl).trim()
+      const enabled = channel === 'vision' ? draft.visionEnabled : draft.generationEnabled
+      if (enabled && (model === '' || baseUrl === '')) {
+        throw new Error('已启用的通道需填写模型 ID 与 Base URL')
+      }
       const saved = await requestJson('/global-multimodal/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,11 +238,11 @@ export function MultimodalSettingsSection(): React.ReactNode {
         <div className={css.fields}>
           <label className={css.field}>
             <span className={css.fieldLabel}>模型 ID</span>
-            <input className={css.input} value={model} spellCheck={false} onChange={(event) => { update(channel, vision ? 'visionModel' : 'generationModel', event.target.value) }} />
+            <input className={css.input} value={model} spellCheck={false} placeholder="填写模型 ID" onChange={(event) => { update(channel, vision ? 'visionModel' : 'generationModel', event.target.value) }} />
           </label>
           <label className={css.field}>
             <span className={css.fieldLabel}>Base URL</span>
-            <input className={css.input} value={baseUrl} spellCheck={false} onChange={(event) => { update(channel, vision ? 'visionBaseUrl' : 'generationBaseUrl', event.target.value) }} />
+            <input className={css.input} value={baseUrl} spellCheck={false} placeholder="填写 Base URL（OpenAI 兼容端点，如 https://api.example.com/v3）" onChange={(event) => { update(channel, vision ? 'visionBaseUrl' : 'generationBaseUrl', event.target.value) }} />
           </label>
           <label className={css.field}>
             <span className={css.fieldLabel}>API Key</span>
@@ -255,7 +263,7 @@ export function MultimodalSettingsSection(): React.ReactNode {
           </button>
         ) : null}
         <footer className={css.actions}>
-          <button className={css.secondaryButton} type="button" disabled={operation !== null || loading} onClick={() => { void test(channel) }}>
+          <button className={css.secondaryButton} type="button" disabled={operation !== null || loading || model.trim() === '' || baseUrl.trim() === ''} title={model.trim() === '' || baseUrl.trim() === '' ? '请先填写模型 ID 与 Base URL' : undefined} onClick={() => { void test(channel) }}>
             {operation === 'test' ? '测试中…' : '测试连接'}
           </button>
           <button className={css.primaryButton} type="button" disabled={operation !== null || loading} onClick={() => { void save(channel) }}>

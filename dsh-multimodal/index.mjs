@@ -11,13 +11,17 @@ const CONFIG_PATH = join(PLUGIN_DIR, 'global-multimodal-config.json')
 const VISION_CREDENTIAL_REF = 'DSH_VISION_API_KEY'
 const GENERATION_CREDENTIAL_REF = 'DSH_GENERATION_API_KEY'
 
+// No vendor defaults: both channels start unconfigured (empty model and base
+// URL) and must be filled in — via the settings page or by editing the config
+// file — before the tools can call anything. Any OpenAI-compatible endpoint
+// works.
 const DEFAULT_CONFIG = Object.freeze({
   visionEnabled: true,
-  visionModel: 'doubao-seed-2-1-pro-260628',
-  visionBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+  visionModel: '',
+  visionBaseUrl: '',
   generationEnabled: true,
-  generationModel: 'doubao-seedream-5-0-260128',
-  generationBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+  generationModel: '',
+  generationBaseUrl: '',
 })
 
 // Doubao rejects tiny placeholder images; keep the connection probe at 16x16.
@@ -222,6 +226,8 @@ function cleanText(value, fallback, maxLength = 512) {
 
 function cleanBaseUrl(value, fallback) {
   const text = cleanText(value, fallback, 2048).replace(/\/+$/, '')
+  // Empty means "not configured yet"; call sites enforce presence when needed.
+  if (text === '') return ''
   let parsed
   try {
     parsed = new URL(text)
@@ -232,6 +238,15 @@ function cleanBaseUrl(value, fallback) {
     throw new Error('Base URL 仅支持 http(s) 地址')
   }
   return text
+}
+
+// A channel is callable only when both its model id and base URL are set;
+// anything else gets a actionable message pointing at the two config paths.
+function requireChannelConfig(channel, config) {
+  const label = channel === 'vision' ? '视觉模型' : '生图模型'
+  if (!config[`${channel}Model`] || !config[`${channel}BaseUrl`]) {
+    throw new Error(`${label}未配置：请前往「设置 → 多模态」，或编辑插件目录的 global-multimodal-config.json，填写模型 ID 与 Base URL`)
+  }
 }
 
 function normalizeConfig(value) {
@@ -463,6 +478,8 @@ export function apply(ctx) {
       if (channel === 'vision') {
         const model = cleanText(body.model, config.visionModel)
         const baseUrl = cleanBaseUrl(body.baseUrl, config.visionBaseUrl)
+        if (!model) throw new Error('请先填写视觉模型 ID')
+        if (!baseUrl) throw new Error('请先填写视觉通道 Base URL')
         const result = await runHelper({
           kind: 'vision',
           apiKey,
@@ -479,6 +496,8 @@ export function apply(ctx) {
       }
       const model = cleanText(body.model, config.generationModel)
       const baseUrl = cleanBaseUrl(body.baseUrl, config.generationBaseUrl)
+      if (!model) throw new Error('请先填写生图模型 ID')
+      if (!baseUrl) throw new Error('请先填写生图通道 Base URL')
       const result = await runHelper({
         kind: 'gen',
         apiKey,
@@ -705,6 +724,7 @@ export function apply(ctx) {
     async execute(args, exec) {
       const config = loadConfig()
       if (!config.visionEnabled) throw new Error('视觉通道已停用，请前往“设置 → 多模态”启用')
+      requireChannelConfig('vision', config)
       const apiKey = await resolveCredential('vision')
       const images = await resolveVisionSources(args, exec)
       const result = await runHelper({ kind: 'vision', apiKey, baseUrl: config.visionBaseUrl, model: config.visionModel, prompt: args.prompt, images, detail: args.detail || '', maxTokens: args.max_tokens || 2048, timeoutMs: 300000 }, exec?.signal)
@@ -757,6 +777,7 @@ export function apply(ctx) {
     async execute(args, exec) {
       const config = loadConfig()
       if (!config.generationEnabled) throw new Error('生图通道已停用，请前往“设置 → 多模态”启用')
+      requireChannelConfig('generation', config)
       const apiKey = await resolveCredential('generation')
       let references = await resolveExplicitSources(args.references)
       if (references.length === 0) references = await Promise.all((await findPastedImageRefs(exec)).map(attachmentToDataUrl))
@@ -780,7 +801,7 @@ export function apply(ctx) {
   // screenshot) inline in the assistant output. Unlike the harness read_image
   // tool, this carries no image-capability gate, so a text-only model can
   // display images it produced during the turn. The presentationMeta carries
-  // the attachment refs so the doubao-multimodal client's GenerateImageRow
+  // the attachment refs so the multimodal client's GenerateImageRow
   // renders them inline under the tool call.
   ctx.effect(() => ctx.tools.register({
     name: 'show_image',

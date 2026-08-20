@@ -73,7 +73,7 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 - `DSH_VISION_API_KEY` — 视觉模型
 - `DSH_GENERATION_API_KEY` — 生图模型
 
-两个通道的模型 ID 与 Base URL 均可配置，支持任何 OpenAI 兼容端点（Gemini、GPT、豆包等），默认为火山方舟豆包。装了 client 插件后在 web UI「设置 → 多模态」里填即可；没装 client 手编 `~/.dsh/.credentials.yaml`。本开源包不含凭据与运行时配置（`global-multimodal-config.json`），首次运行用默认配置；需要换模型/端点时在设置页改，或直接编辑插件目录下自动生成的 `global-multimodal-config.json`。
+两个通道的模型 ID 与 Base URL 均可配置，支持任何 OpenAI 兼容端点（Gemini、GPT、豆包等），**不预置任何默认值**。装了 client 插件后在 web UI「设置 → 多模态」里填即可；没装 client 手编 `~/.dsh/.credentials.yaml` 与插件目录下的 `global-multimodal-config.json`。首次使用需先填好模型 ID 与 Base URL，填好前工具调用会提示未配置。本开源包不含凭据与运行时配置。
 
 ## License
 
