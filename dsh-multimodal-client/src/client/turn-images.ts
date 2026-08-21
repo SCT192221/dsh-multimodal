@@ -80,10 +80,12 @@ export const turnImagesDefinition: ConversationNodeDefinition<{ turn: number; im
     // of presentationMeta; "no meta" degrades to final (pre-flag sessions
     // always showed their images), an explicit false opts out.
     const final = readMetaFinal(data.meta)
+    console.debug('[mm] tool/result seq=' + match.event.seq, 'meta=' + JSON.stringify(data.meta)?.slice(0, 120), 'final=' + String(final))
     if (final === false) return context.state
     // Images come from the render content (image blocks, nested included) —
     // the content path is what the durable log actually carries.
     const refs = collectImageRefs(message.content ?? [])
+    console.debug('[mm] collected refs=' + refs.length)
     if (refs.length === 0) return context.state
     // Dedup by attachmentId.
     const seen = new Set<string>(context.state.images.map(r => String(r.attachment.attachmentId)))
@@ -114,7 +116,9 @@ export const turnImagesDefinition: ConversationNodeDefinition<{ turn: number; im
  */
 export function selectTurnImages(owner: TurnTailOwnerProps): readonly TurnImageRef[] | null {
   const data = owner.turn.data.get('turnImages')
+  console.debug('[mm] select called, turnData=' + (data === undefined ? 'undefined' : `${data.images.length} images`))
   if (data === undefined) return null
   const filtered = data.images.filter(ref => ref.seq <= owner.seq)
+  console.debug('[mm] filtered=' + filtered.length + ' (owner.seq=' + owner.seq + ')')
   return filtered.length === 0 ? null : filtered
 }

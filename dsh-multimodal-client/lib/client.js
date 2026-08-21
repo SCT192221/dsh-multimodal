@@ -172,8 +172,11 @@ window.__ModuleLoader__.load({
 				const data = match.event.data;
 				const message = data.message;
 				if (message === void 0) return context.state;
-				if (readMetaFinal(data.meta) === false) return context.state;
+				const final = readMetaFinal(data.meta);
+				console.debug("[mm] tool/result seq=" + match.event.seq, "meta=" + JSON.stringify(data.meta)?.slice(0, 120), "final=" + String(final));
+				if (final === false) return context.state;
 				const refs = collectImageRefs(message.content ?? []);
+				console.debug("[mm] collected refs=" + refs.length);
 				if (refs.length === 0) return context.state;
 				const seen = new Set(context.state.images.map((r) => String(r.attachment.attachmentId)));
 				const additions = [];
@@ -206,8 +209,10 @@ window.__ModuleLoader__.load({
 		*/
 		function selectTurnImages(owner) {
 			const data = owner.turn.data.get("turnImages");
+			console.debug("[mm] select called, turnData=" + (data === void 0 ? "undefined" : `${data.images.length} images`));
 			if (data === void 0) return null;
 			const filtered = data.images.filter((ref) => ref.seq <= owner.seq);
+			console.debug("[mm] filtered=" + filtered.length + " (owner.seq=" + owner.seq + ")");
 			return filtered.length === 0 ? null : filtered;
 		}
 		//#endregion
@@ -222,30 +227,30 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var MultimodalSettingsSection_module_css_default = {
+			"secondaryButton": "HI6d2W_secondaryButton",
+			"grid": "HI6d2W_grid",
+			"message": "HI6d2W_message",
+			"switchThumb": "HI6d2W_switchThumb",
 			"switchText": "HI6d2W_switchText",
+			"input": "HI6d2W_input",
 			"clearButton": "HI6d2W_clearButton",
 			"cardTitle": "HI6d2W_cardTitle",
 			"section": "HI6d2W_section",
-			"switchLabel": "HI6d2W_switchLabel",
-			"input": "HI6d2W_input",
-			"secondaryButton": "HI6d2W_secondaryButton",
-			"intro": "HI6d2W_intro",
-			"switchTrack": "HI6d2W_switchTrack",
-			"fieldLabel": "HI6d2W_fieldLabel",
-			"card": "HI6d2W_card",
-			"headingBlock": "HI6d2W_headingBlock",
-			"loading": "HI6d2W_loading",
-			"primaryButton": "HI6d2W_primaryButton",
 			"cardHeader": "HI6d2W_cardHeader",
+			"switchTrack": "HI6d2W_switchTrack",
+			"intro": "HI6d2W_intro",
 			"field": "HI6d2W_field",
-			"cardSubtitle": "HI6d2W_cardSubtitle",
-			"fields": "HI6d2W_fields",
+			"switchLabel": "HI6d2W_switchLabel",
+			"fieldLabel": "HI6d2W_fieldLabel",
 			"heading": "HI6d2W_heading",
-			"switchThumb": "HI6d2W_switchThumb",
-			"message": "HI6d2W_message",
-			"grid": "HI6d2W_grid",
+			"card": "HI6d2W_card",
+			"switchInput": "HI6d2W_switchInput",
+			"loading": "HI6d2W_loading",
 			"actions": "HI6d2W_actions",
-			"switchInput": "HI6d2W_switchInput"
+			"primaryButton": "HI6d2W_primaryButton",
+			"headingBlock": "HI6d2W_headingBlock",
+			"fields": "HI6d2W_fields",
+			"cardSubtitle": "HI6d2W_cardSubtitle"
 		};
 		//#endregion
 		//#region lib/types/client/MultimodalSettingsSection.js
