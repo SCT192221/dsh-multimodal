@@ -7,7 +7,8 @@ DeepSeek Harness 的多模态 host 插件：给文本模型补全视觉与生图
 - **vision** — 识图 / OCR / 图表理解 / 多图比较 / 视觉问答。省略 `images` 时自动读取本会话最近一次粘贴或发送的图片（跨轮可读）。
 - **generate_image** — 文生图 / 参考图编辑（P图）。省略 `references` 时自动用本会话最近一次图片作参考。
   - **参考图比例匹配**：有参考图且未显式传 `WIDTHxHEIGHT` 时，读参考图宽高比，从豆包 Seedream 该档（2K/3K）官方推荐像素表里按对数距离选最近的 `WIDTHxHEIGHT` 传 API——新图严格匹配参考图比例，不再固定 2K 出方图。
-- **show_image** — 把本地图片文件（脚本生成的图表、截图等）直接展示在对话输出里。传 `path`（单张）或 `paths`（多张列表）。对纯文本模型也可用（无 `read_image` 的 image-capable 闸）。
+  - **超限自动预览**：生成的图片超过 harness 附件准入限制（新版默认单边 2000px / 字节数上限）时，自动等比缩放为预览图（名称带 `-preview`）内联展示，原始分辨率文件照常写入 `<workspace>/imgs/` 并在 `files` 里给出路径。
+- **show_image** — 把本地图片文件（脚本生成的图表、截图等）直接展示在对话输出里。传 `path`（单张）或 `paths`（多张列表）。对纯文本模型也可用（无 `read_image` 的 image-capable 闸）。超限图片同样自动缩放为预览展示。
 - **llm/stream text-only 适配** — 纯文本模型收到带图消息时，在 adapter 边界把图片替换为内联提示（`[本条消息含 N 张图片，请调用 vision 工具]`），仅改模型请求、不碰 durable 日志，图片在浏览器照常显示。
 
 ## 工具
@@ -57,7 +58,7 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 
 ## 依赖
 
-- **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，向所配置的 OpenAI 兼容端点发 `chat/completions`（vision）与 `images/generations`（generate_image）请求。无需额外依赖，标准 Node 内置 `fetch`。
+- **helper 子进程**：`multimodal-helper.cjs` 由 `index.mjs` 用 node 子进程调用，向所配置的 OpenAI 兼容端点发 `chat/completions`（vision）与 `images/generations`（generate_image）请求；超限缩图用 sharp 完成（从 dsh 安装树解析，rc.8+ 的 `attachment-local` 自带该依赖，用户无需安装）。API 请求仅用 Node 内置 `fetch`。
 - **配套 client 插件**：同仓库的 [`dsh-multimodal-client`](../dsh-multimodal-client/) 渲染 `generate_image`/`show_image` 的工具卡内联图与 turn-tail 图集，并提供「设置 → 多模态」设置页。可选：未安装时 `vision` 的文本结果不受影响，工具结果中的图片以通用卡片显示（附件引用完整，模型可正常引用），配置需手编文件。
 
 ## 已知问题
@@ -66,17 +67,18 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 
 ## harness 附件尺寸上限与你的选择
 
-新版 harness 的附件存储默认限制**单边 2000px**（`attachment-local` 服务的 `maxImageDimension`，引入原因是模型路由会拒绝多图请求中超 2000px 的历史图片；旧版 harness 无此限制）。本插件默认生成 2K/3K 尺寸，必然超过该上限，因此 2K/3K 原图默认无法内联展示。
+新版 harness（rc.8 起）的附件存储默认限制**单边 2000px**（`attachment-local` 服务的 `maxImageDimension`，引入原因是模型路由会拒绝多图请求中超 2000px 的历史图片；旧版 harness 无此限制）。本插件默认生成 2K/3K 尺寸，必然超过该上限。
 
-不配置任何东西时，插件已做优雅降级，**功能不会坏**：
+**0.2.0 起零配置即可内联预览**：超限图片会自动等比缩放到限内（名称带 `-preview` 后缀）入库内联展示，原始分辨率文件完整保留，**功能不会坏**：
 
-- **generate_image**：生成照常成功、文件照常写入 `<workspace>/imgs/`；超限图片无法内联展示时，结果降级为返回文件路径（`files` 字段）并附配置提示——不会让工具调用失败，模型也不会因此重试。
-- **show_image**：展示超限图片时报错并给出实际尺寸、上限值与配置方法。
-- 贴图本身也受此限制（harness 层行为）：单边超 2000px 的图会被拒入会话。
+- **generate_image**：生成照常成功、原图照常写入 `<workspace>/imgs/`；超限的那张以预览图内联展示，对应原图路径列在结果 `files` 里（预览原图在前、未内联的在后）。找不到 sharp 或缩放失败时退回纯路径交付并附配置提示——工具不会失败，模型也不会因此重试。
+- **show_image**：超限图片同样自动缩放为预览展示，原路径见 `paths`；缩放不可用时才报错并给出实际尺寸、上限值与配置方法。
+- 贴图本身仍受 harness 层限制（不受本插件控制）：单边超 2000px 的图会被拒入会话。
+- 缩图由 helper 子进程用 sharp 完成，sharp 从 dsh 安装树自动解析（rc.8+ 的 `attachment-local` 自带该依赖，npm/pnpm/源码启动均覆盖）；旧版 harness 无限制时这条路径根本不会触发，行为与从前一致。
 
 想看内联原图？两种方案按需取舍：
 
-### 方案 A：调大 harness 上限（推荐，看 2K/3K 原图）
+### 方案 A：调大 harness 上限（看 2K/3K 原图）
 
 在 `~/.dsh/settings.yaml` 追加后重启 `dsh web`：
 
@@ -85,16 +87,16 @@ attachment-local:
   maxImageDimension: 4096   # 3K 档最大单边 4704，需全覆盖可设 4800
 ```
 
-- ✅ 2K/3K 原图直接在工具卡与图集里内联展示，视觉质量无损
+- ✅ 2K/3K 原图直接在工具卡与图集里内联展示，视觉质量无损，不产生预览图
 - ✅ 贴图也放宽（≤4096px 的截图可直接进会话）
 - ⚠️ 该上限存在的原始原因是保护模型路由：会话历史里**同时携带多张**大图时，可能被模型路由拒绝。生图工作流（单图/少图）一般无碍；如果你常贴多张大图同时识别，建议保持默认并选方案 B
 
-### 方案 B：不动配置（零配置，文件路径交付）
+### 方案 B：不动配置（零配置，自动缩放预览）
 
-- ✅ 无需改 harness 任何配置，装完即用
-- ✅ 原始分辨率文件完整保存在 `<workspace>/imgs/`，随时可取用
-- ⚠️ 超限图片不内联展示：模型拿到的是文件路径，通常会自行生成缩略图（如 PowerShell 缩图后 `show_image`）再展示，多一步来回
-- 适合：主要用 `vision` 识图、生图只是偶尔导出物料的场景
+- ✅ 无需改 harness 任何配置，装完即用；超限图片自动以预览内联展示，不再是干巴巴的文件路径
+- ✅ 原始分辨率文件完整保存在 `<workspace>/imgs/`（或 `show_image` 的原路径），随时可取用
+- ⚠️ 内联的是缩到 2000px 内的 JPEG 预览，细节有损；要无损原图请用方案 A
+- 适合：不想动配置、以识图出图为主、偶尔需要放大看原图的场景
 
 ## License
 

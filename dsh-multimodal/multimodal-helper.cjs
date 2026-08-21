@@ -88,12 +88,104 @@ async function runGen(req) {
   }
   return { images: images };
 }
+// Resolve sharp across dsh install layouts. The helper runs from the plugin
+// directory which has no node_modules, so a bare require('sharp') only works
+// when NODE_PATH happens to cover it. Otherwise probe the layouts dsh
+// actually uses, anchored on paths the host process passes in:
+//   1. npm-style installs: <install-root>/node_modules/sharp (walk up from
+//      the host's entry script)
+//   2. pnpm installs: <root>/node_modules/.pnpm/sharp@*/node_modules/sharp
+//   3. profile installs: ~/.dsh/profiles/<name>/node_modules[/.pnpm/...]
+// Works on rc.7 source trees and rc.8+ npm installs alike; when nothing
+// resolves, the caller keeps its path-delivery degradation.
+let sharpCache = null;
+function loadSharp(anchors) {
+  if (sharpCache) return sharpCache;
+  try { sharpCache = require('sharp'); return sharpCache; } catch (e) {}
+  const candidates = [];
+  const pushRoot = function (root) {
+    candidates.push(path.join(root, 'node_modules', 'sharp'));
+    try {
+      const pnpm = path.join(root, 'node_modules', '.pnpm');
+      const entries = fs.readdirSync(pnpm).filter(function (x) { return x.indexOf('sharp@') === 0; });
+      for (let i = 0; i < entries.length; i += 1) {
+        candidates.push(path.join(pnpm, entries[i], 'node_modules', 'sharp'));
+      }
+    } catch (e) {}
+  };
+  for (let a = 0; a < (anchors || []).length; a += 1) {
+    const anchor = anchors[a];
+    if (typeof anchor !== 'string' || anchor === '') continue;
+    let dir = path.dirname(path.resolve(anchor));
+    for (let i = 0; i < 12; i += 1) {
+      pushRoot(dir);
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  try {
+    const home = process.env.DSH_HOME || path.join(require('os').homedir(), '.dsh');
+    const profiles = path.join(home, 'profiles');
+    const names = fs.readdirSync(profiles, { withFileTypes: true });
+    for (let i = 0; i < names.length; i += 1) {
+      if (names[i].isDirectory()) pushRoot(path.join(profiles, names[i].name));
+    }
+  } catch (e) {}
+  // Common npm global prefixes, for launchers whose argv[1] does not sit
+  // inside the install tree.
+  if (process.platform === 'win32') {
+    if (process.env.APPDATA) pushRoot(path.join(process.env.APPDATA, 'npm'));
+  } else {
+    pushRoot('/usr/local/lib');
+    pushRoot('/usr/lib');
+  }
+  for (let i = 0; i < candidates.length; i += 1) {
+    try { sharpCache = require(candidates[i]); return sharpCache; } catch (e) {}
+  }
+  throw new Error('sharp 不可用：未在 dsh 安装或 profile 依赖中找到（无法生成预览图，将按路径交付）');
+}
+
+// Shrink one image so both per-side pixels and encoded bytes fit the harness
+// attachment admission limits. Ratio is preserved; only downscaling ever
+// happens. Sharp is present wherever attachment-local is (it is that
+// package's dependency since rc.1), so this works on rc.7 and rc.8 alike.
+async function runShrink(req) {
+  const sharp = loadSharp(req.anchors);
+  const buf = Buffer.from(req.base64, 'base64');
+  const maxSide = Number(req.maxSide) > 0 ? Number(req.maxSide) : 2000;
+  const maxBytes = Number(req.maxBytes) > 0 ? Number(req.maxBytes) : 3.5 * 1024 * 1024;
+  let out = buf;
+  // Iterate: first fit within the side cap at high quality, then halve the
+  // pixel cap and quality if still over the byte budget. A ~2K JPEG at q80
+  // lands well under 3.5MB, so the loop rarely runs past the first pass.
+  for (let pass = 0; pass < 3; pass += 1) {
+    const side = Math.max(256, Math.floor(maxSide / Math.pow(2, pass)));
+    const quality = Math.max(50, 90 - pass * 20);
+    try {
+      out = await sharp(out, { failOn: 'error', limitInputPixels: false })
+        .rotate() // honor EXIF orientation before resizing
+        .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: quality, mozjpeg: true })
+        .toBuffer();
+    } catch (e) {
+      throw new Error('sharp 处理图片失败: ' + ((e && e.message) || String(e)));
+    }
+    const meta = await sharp(out).metadata();
+    if (out.length <= maxBytes && Math.max(meta.width || 0, meta.height || 0) <= maxSide) break;
+  }
+  return { base64: out.toString('base64'), mime: 'image/jpeg', bytes: out.length };
+}
+
 async function main() {
   const reqFile = process.argv[2];
   const resFile = process.argv[3];
   let req = null;
   try { req = JSON.parse(fs.readFileSync(reqFile, 'utf8')); } catch (e) { writeResult(resFile, { ok: false, error: '无法读取请求文件: ' + (e && e.message) }); return; }
-  try { const r = req.kind === 'vision' ? await runVision(req) : await runGen(req); writeResult(resFile, { ok: true, kind: req.kind, result: r }); }
+  try {
+    const r = req.kind === 'vision' ? await runVision(req) : req.kind === 'shrink' ? await runShrink(req) : await runGen(req);
+    writeResult(resFile, { ok: true, kind: req.kind, result: r });
+  }
   catch (e) { writeResult(resFile, { ok: false, error: (e && e.message) ? e.message : String(e) }); }
 }
 main();

@@ -4,7 +4,7 @@
 
 | 包 | 类型 | 作用 |
 |------|------|------|
-| `dsh-multimodal` | host 插件 | vision 识图 + generate_image 生图/改图（含参考图比例匹配）+ show_image 展示（支持多张）+ 纯文本模型 image-strip 适配 + `/global-multimodal/*` 配置路由 |
+| `dsh-multimodal` | host 插件 | vision 识图 + generate_image 生图/改图（含参考图比例匹配、超限自动缩放预览）+ show_image 展示（支持多张）+ 纯文本模型 image-strip 适配 + `/global-multimodal/*` 配置路由 |
 | `dsh-multimodal-client` | client 插件 | 工具卡内联图 + turn-tail 图集 + 「设置 → 多模态」设置页（模型/端点/API Key/连接测试） |
 
 > 只装 host 也能用：工具全部可用，图片以通用卡片显示、配置走手编文件；装上 client 才有图片渲染和设置页。
@@ -66,7 +66,7 @@ git apply <本仓库路径>/patches/apiproxy-modality-guard.patch
 
 不打补丁时贴图会被拒，但 `vision` 传显式路径/URL、文生图、`show_image` 均正常。原理与手动改法详见 `dsh-multimodal/README.md`。
 
-> **新版 harness 用户注意**：附件存储默认限制单边 2000px（`maxImageDimension`），2K/3K 生成图会超限。插件已做优雅降级（生成照常、文件照存、结果返回路径与配置提示，工具不会报错死循环）。想要 2K/3K 原图内联展示，可调大 `~/.dsh/settings.yaml` 里 `attachment-local` 的 `maxImageDimension`（如 4096）——调与不调的取舍详见 `dsh-multimodal/README.md` 的「harness 附件尺寸上限与你的选择」。
+> **新版 harness 用户注意**：附件存储默认限制单边 2000px（`maxImageDimension`），2K/3K 生成图会超限。插件已做优雅降级（生成照常、原图照存，超限图自动等比缩放为预览内联展示，原图路径在 `files` 里返回；缩放不可用时退回纯路径交付）。想要 2K/3K 原图无损内联展示，可调大 `~/.dsh/settings.yaml` 里 `attachment-local` 的 `maxImageDimension`（如 4096）——调与不调的取舍详见 `dsh-multimodal/README.md` 的「harness 附件尺寸上限与你的选择」。旧版 harness（rc.7 及更早）无此限制，行为不变。
 
 ## 配置凭据
 
